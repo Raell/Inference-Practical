@@ -103,9 +103,43 @@ for(K in 1:5) {
 }
 ```
 ```{r}
-# anova(a,b,)
+K0 = 3
+par = integer(K0+1)
+  
+theta0 = optim(par=par, loglike, method="BFGS", y=cov$CMODateCount)
+
+
+K1 = 4
+par = integer(K1+1)
+  
+theta1 = optim(par=par, loglike, method="BFGS", y=cov$CMODateCount)
+
+
+t = 2 * (theta0$value - theta1$value)
+
+p <- pchisq(t,df=1)
+1-p
 ```
 
+```{r}
+K1 = 4
+par = integer(K1+1)
+  
+theta1 = optim(par=par, loglike, method="BFGS", y=cov$CMODateCount, hessian = TRUE)
+covar = solve(theta1$hessian)
+
+se <- sqrt(diag(covar))
+
+ci.lower = rep(0,5)
+ci.upper = rep(0,5)
+for (i in 1:5) {
+  ci.lower <- theta1$par[i]-1.96*se[i]
+  ci.upper = theta1$par[i]+1.96*se[i]
+}
+sum(ci.lower)
+sum(ci.upper)
+
+```
 
 
 
