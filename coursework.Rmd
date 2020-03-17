@@ -7,8 +7,39 @@ output: html_notebook
 
 ```{r}
 cov <- read.table("covid19.csv", sep=",",header=TRUE)
-cov$CMODateCount
+# cov$CMODateCount
+
+for (K in 1:5) {
+  par = integer(K+1)
+  
+  theta = optim(par=par, loglike, method="BFGS", y=cov$CMODateCount)
+  
+  n0 = theta$par[1]
+  beta = theta$par[2:length(theta$par)]
+  
+  t = seq(-1, 1, length.out=length(cov$CMODateCount))
+  
+  with(cov,plot(1:41,cov$CMODateCount))
+  
+  
+  e = exp(n0)
+  
+  for (i in seq_along(beta)) {
+    e = e * exp(beta[i] * t^i)
+  }
+  
+  
+  
+  lines(1:length(cov$CMODateCount), e, col="red")
+  
+  print(AIC(length(par), theta$value)) 
+}
+
 ```
+
+
+
+
 ```{r}
 N = function(t, n0, beta) {
   val = exp(n0)
@@ -32,16 +63,61 @@ llik = function(y, theta) {
 }
 
 
+loglike = function(y, theta) {
+  n0 = theta[1]
+  beta = theta[2:length(theta)]
+  n = length(y)
+  t = seq(-1, 1, length.out=n)
+  ll <-sum(dpois(y, N(t, n0, beta), log=TRUE))
+  -ll
+}
 
-K = 4
+
+K = 1
 
 par = integer(K+1)
 
-theta = optim(par=par, llik, method="BFGS", y=cov$CMODateCount)
-n0 = theta$par[1]
-beta = theta$par[2:length(theta$par)]
 
-n0
-beta
+
+# theta = optim(par=par, loglike, method="BFGS", y=cov$CMODateCount)
+# n0 = theta$par[1]
+# beta = theta$par[2:length(theta$par)]
+# 
+# 
+# n0
+# beta
 ```
+```{r}
+AIC = function(num_par, val_ll) {
+  2*val_ll + 2 * num_par
+}
+
+for(K in 1:5) {
+  par = integer(K+1)
+
+  theta = optim(par=par, loglike, method="BFGS", y=cov$CMODateCount)
+  n0 = theta$par[1]
+  beta = theta$par[2:length(theta$par)]
+  
+  print(AIC(length(par), theta$value))
+}
+```
+```{r}
+# anova(a,b,)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
