@@ -7,7 +7,7 @@ output: html_notebook
 
 ```{r}
 cov <- read.table("covid19.csv", sep=",",header=TRUE)
-# cov$CMODateCount
+# cov$CMODateCount #
 
 # the simple model that allows for departure from unbounded exponential growth
 N = function(t, n0, beta) {
