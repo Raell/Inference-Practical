@@ -56,7 +56,7 @@ for (K in 1:5) {
   lines(1:length(cov$CMODateCount), e, col="red")
   legend("topleft", legend=paste("Model when K value = ", K), col="red", lty=1:2, cex=0.8)
   aic <- AIC(length(par), theta$value)
-  cat("AIC for ", K, " is: ", aic, "\n")
+  cat("AIC for K =", K, "is: ", aic, "\n")
 }
 
 ```
