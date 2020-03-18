@@ -87,7 +87,9 @@ p <- pchisq(t,df=1)
 # &&&&&&&&7
 1-p
 
+# If this boolean outputs TRUE, which it does, we reject the null hypothesis (when K=3)
 1-p < 0.05
+ 
 ```
 
 ```{r}
