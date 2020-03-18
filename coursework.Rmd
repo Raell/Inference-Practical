@@ -68,7 +68,7 @@ for (K in 1:5) {
   lines(1:length(cov$CMODateCount), e, col="red")
   legend("topleft", legend=paste("Model when K value = ", K), col="red", lty=1:2, cex=0.8)
   aic <- AIC(length(theta0), theta.hat$value)
-  cat("AIC for ", K, " is: ", aic, "\n")
+  cat("AIC for K =", K, "is:", aic, "\n")
 }
 
 ##Comment: By comparing the AIC values for each K from 1 to 5, the model with K=3 (i.e. 4 parameters) is the best model because it has the lowest AIC value. By minimising AIC, we minimise the Kullback-Leibler divergence. This implies the model with K=4 is the model that is the closest to the true model in the probabilistic average sense. 
@@ -97,38 +97,40 @@ t = 2 * (theta0$value - theta1$value) # GLRT test statisic
 p <- 1- pchisq(t,df=1) # degree of freedom is 1 because H0 imposes 1 restriction on the parameter vector
 p # p-value
 
-# Comment: since the p-value is very small, it implies that our data is not very consistent with H0 being true. Therefore, there is very strong evidence of rejecting H0. This implies the model when K=4 cannot be simplified further.  
+# Comment: since the p-value = 0.00075 is very small, it implies that our data is not very consistent with H0 being true. Therefore, there is very strong evidence of rejecting H0. This implies the model when K=4 cannot be simplified further.  
 ```
 
 
 # Question 3
 ```{r}
-
+# Working on the model with K=4
 K1 = 4
-par = integer(K1+1)
+par1= integer(K1+1)
+theta1 = optim(par1, neg_loglike, method="BFGS", y=cov$CMODateCount,hessian=TRUE)
 
-theta1 = optim(par=par, loglike, method="BFGS", y=cov$CMODateCount, hessian = TRUE)
-
-# the inverse of the hessian is the covariance matrix
+# the inverse of the hessian is the approximate covariance matrix
 covar = solve(theta1$hessian)
 print("The approximate covariance matrix is: ", quote=FALSE)
 covar
 ```
 
+
 ```{r}
 ### Question 4 ###
-se <- sqrt(diag(covar))
+se <- sqrt(diag(covar)) # standard error
 
 ci.lower = rep(0,5)
 ci.upper = rep(0,5)
 for (i in 1:5) {
-  ci.lower <- theta1$par[i]-1.96*se[i]
-  ci.upper = theta1$par[i]+1.96*se[i]
+  ci.lower <- theta1$par[i]-1.96*se[i] # lower bound for each parameter
+  ci.upper = theta1$par[i]+1.96*se[i] # upper bound for each parameter
 }
 
 print(" 95% confidence interval for estimates of log(N(t))", quote = FALSE)
 cat("the lower bound is: ", sum(ci.lower), "\n")
 cat("the upper bound is: ", sum(ci.upper), "\n")
+
+# comment: since log(N(t))=n0+sum(beta*t^i) is a linear transformation (sum) of the parameters, we have the 95% confidence interval for log(N(t)) is the sum of 95% confidence intervals for each parameter. 
 
 ```
 
