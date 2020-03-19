@@ -71,7 +71,7 @@ for (K in 1:5) {
   cat("AIC for K =", K, "is:", aic, "\n")
 }
 
-##Comment: By comparing the AIC values for each K from 1 to 5, the model with K=3 (i.e. 4 parameters) is the best model because it has the lowest AIC value. By minimising AIC, we minimise the Kullback-Leibler divergence. This implies the model with K=4 is the model that is the closest to the true model in the probabilistic average sense. 
+##Comment: By comparing the AIC values for each K from 1 to 5, the model with K=4 (i.e. 5 parameters) is the best model because it has the lowest AIC value. By minimising AIC, we minimise the Kullback-Leibler divergence. This implies the model with K=4 is the model that is the closest to the true model in the probabilistic average sense. 
 ```
 
 
@@ -115,27 +115,60 @@ covar
 ```
 
 
+# Question 4
 ```{r}
-### Question 4 ###
-se <- sqrt(diag(covar)) # standard error
-
-ci.lower = rep(0,5)
-ci.upper = rep(0,5)
-for (i in 1:5) {
-  ci.lower <- theta1$par[i]-1.96*se[i] # lower bound for each parameter
-  ci.upper = theta1$par[i]+1.96*se[i] # upper bound for each parameter
+T = function(ti) {
+  c(1, ti^1, ti^2, ti^3, ti^4)
 }
 
-print(" 95% confidence interval for estimates of log(N(t))", quote = FALSE)
-cat("the lower bound is: ", sum(ci.lower), "\n")
-cat("the upper bound is: ", sum(ci.upper), "\n")
+logN = function(mle, ti) {
+  val = sum(mle * T(ti))
+  val
+}
 
-# comment: since log(N(t))=n0+sum(beta*t^i) is a linear transformation (sum) of the parameters, we have the 95% confidence interval for log(N(t)) is the sum of 95% confidence intervals for each parameter. 
+cov.logN = function(cov, ti) {
+  val = t(T(ti)) %*% cov %*% T(ti)
+  val
+}
 
+ci.lower = function(ts, mle, cov) {
+  val = rep(0, length(ts))
+  for(i in seq_along(ts)) {
+    val[i] = logN(mle, ts[i]) - qt(0.95, 36)*sqrt(cov.logN(cov, ts[i]))
+  }
+  val
+}
+
+ci.upper = function(ts, mle, cov) {
+  val = rep(0, length(ts))
+  for(i in seq_along(ts)) {
+    val[i] = logN(mle, ts[i]) + qt(0.95, 36)*sqrt(cov.logN(cov, ts[i]))
+  }
+  val
+}
+
+ci.avg = function(ts, mle, cov) {
+  val = rep(0, length(ts))
+  for(i in seq_along(ts)) {
+    val[i] = logN(mle, ts[i])
+  }
+  val
+}
+
+t = seq(-1,1,length.out=length(cov$CMODateCount))
+
+ci.lower(t, theta1$par, covar)
+
+
+with(cov,plot(1:41,cov$CMODateCount, main = "Number of new cases per day from 31/01/2020 to 11/03/2020",xlab = "Day No.", ylab = "Number of new cases"))
+
+lines(1:length(cov$CMODateCount), exp(ci.lower(t, theta1$par, covar)), col="blue")
+lines(1:length(cov$CMODateCount), exp(ci.avg(t, theta1$par, covar)), col="red")
+lines(1:length(cov$CMODateCount), exp(ci.upper(t, theta1$par, covar)), col="purple")
+legend("topleft", 
+       legend=c("95% CI upper bound", "Estimated model", "95% CI lower bound"), 
+       col=c("purple", "red", "blue"), lty=1, cex=0.8)
 ```
-
-
-
 
 
 
