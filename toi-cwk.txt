@@ -1,0 +1,160 @@
+MATH35600 Assessed Practical 2020
+Danielle Bueno (db17072), Yuan Chen (yc17451), Ren Cheong (rc17719)
+
+### Set Up ###
+cov <- read.table("covid19.csv", sep=",",header=TRUE)
+# cov$CMODateCount #
+
+# the simple model that allows for departure from unbounded exponential growth
+N = function(t, n0, beta) {
+  val = exp(n0)
+  for (i in seq_along(beta)) {
+    val = val * exp(beta[i]*t^i)
+  }
+  val
+}
+
+### Question 1 ###
+# produces function to evaluate the negative log likelihood of the model
+# y ~ Poi(N(t))
+
+neg_loglike = function(theta,y) {
+  n0 = theta[1]
+  beta = theta[2:length(theta)]
+  n = length(y)
+  t = seq(-1, 1, length.out=n) # run from -1 to 1 so model is invariant to units that time is measure in, so it doesn't matter if time is measure in seconds, days, or months.
+  ll <-sum(dpois(y, N(t, n0, beta), log=TRUE)) # log likelihood of model
+  -ll # negative log likelihood of model
+}
+
+# produces a function to work out AIC of the model
+AIC = function(num_par, val_ll) {
+  2*val_ll + 2 * num_par # note that it's not -2*val_ll because we are working with negative log likelihood
+}
+
+### Quesion 2 ###
+# fits models with K values from 1 to 5, finds the MLE for theta, finds AIC
+
+for (K in 1:5) {
+  theta0 = integer(K+1) # initial parameter values
+
+  # finds the MLE for theta using optim
+  theta.hat = optim(theta0, neg_loglike, method="BFGS", y=cov$CMODateCount)
+
+  n0 = theta.hat$par[1]
+  beta = theta.hat$par[2:length(theta.hat$par)]
+
+  t = seq(-1, 1, length.out=length(cov$CMODateCount))
+
+ # produce a plot of how well the model fits the data for K from 1 to 5
+  with(cov,plot(1:41,cov$CMODateCount, main = "Number of new cases per day from 31/01/2020 to 11/03/2020",xlab = "Day No.", ylab = "Number of new cases"))
+
+  e = exp(n0)
+  for (i in seq_along(beta)) {
+    e = e * exp(beta[i] * t^i)
+  }
+
+  lines(1:length(cov$CMODateCount), e, col="red")
+  legend("topleft", legend=paste("Model when K value = ", K), col="red", lty=1:2, cex=0.8)
+  aic <- AIC(length(theta0), theta.hat$value)
+  cat("AIC for K =", K, "is:", aic, "\n")
+}
+
+# Comment: By comparing the AIC values for each K from 1 to 5, the model with K=4 (i.e. 5 parameters)
+# is the best model because it has the lowest AIC value. By minimising AIC, we minimise the Kullback-Leibler
+# divergence. This implies the model with K=4 is the model that is the closest to the true model in the
+# probabilistic average sense.
+
+# We want to test whether the model when K=4 can be simplified or not.
+# Null hypothesis: the model with K=3 (Model A) is a good fit to the data
+# Alternative hypothesis: the model with K=4 (Model B) is a good fit to the data
+# We will conduct the hypothesis test using a generalised likelihood ratio statistic (GLRT) because Model A
+# is nested in Model B. In addition, GLRT generalises the Neyman-Pearson test statistic which is the most
+# powerful in simple hypotheses setting.
+
+
+# Null Hypothesis, H0
+K0 = 3
+par0 = integer(K0+1) # dimension of theta in H0
+theta0 = optim(par0, neg_loglike, method="BFGS", y=cov$CMODateCount) # MLE for theta when K=3
+
+# Alternative Hypothesis, H1
+K1 = 4
+par1 = integer(K1+1) # dimension of theta in H1
+theta1 = optim(par1, neg_loglike, method="BFGS", y=cov$CMODateCount) # MLE for theta when K=4
+
+t = 2 * (theta0$value - theta1$value) # GLRT test statisic
+p <- 1- pchisq(t,df=1) # degree of freedom is 1 because H0 imposes 1 restriction on the parameter vector
+p # p-value
+
+# Comment: since the p-value = 0.00075 is very small, it implies that our data is not very consistent
+# with H0 being true. Therefore, there is very strong evidence of rejecting H0. This implies the model
+# when K=4 cannot be simplified further.
+
+### Question 3 ###
+# Working on the model with K=4
+K1 = 4
+par1= integer(K1+1)
+theta1 = optim(par1, neg_loglike, method="BFGS", y=cov$CMODateCount,hessian=TRUE)
+
+# the inverse of the hessian is the approximate covariance matrix
+covar = solve(theta1$hessian)
+print("The approximate covariance matrix is: ", quote=FALSE)
+covar
+
+### Question 4 ###
+T = function(ti) {
+  c(1, ti^1, ti^2, ti^3, ti^4)
+}
+
+# writes a function which outputs the MLE of logN(t)
+# since logN(t) is a linear transformation of the parameters, by invariance under bijective reparameterization, the MLE of logN(t) is the linear transformation of the MLE for each parameter.
+logN = function(mle, ti) {
+  val = sum(mle * T(ti))
+  val
+}
+
+# writes a function which outputs an approximate covariance matrix for logN(t)
+cov.logN = function(cov, ti) {
+  val = t(T(ti)) %*% cov %*% T(ti) # by the standard results on transformation of covariance matrix that cov(AX) = Acov(X)t(A) where X is a random variable and A is a constant matrix with correct dimensions
+  val
+}
+
+# writes a function which outputs the 95% confidence interval lower bound
+ci.lower = function(ts, mle, cov) {
+  val = rep(0, length(ts))
+  for(i in seq_along(ts)) {
+    val[i] = logN(mle, ts[i]) - qt(0.95, 36)*sqrt(cov.logN(cov, ts[i]))
+  }
+  val # 95% confidence interval lower bound
+}
+
+# writes a function which outputs the 95% confidence interval upper bound
+ci.upper = function(ts, mle, cov) {
+  val = rep(0, length(ts))
+  for(i in seq_along(ts)) {
+    val[i] = logN(mle, ts[i]) + qt(0.95, 36)*sqrt(cov.logN(cov, ts[i]))
+  }
+  val # 95% confidence interval upper bound
+}
+
+# the estimated model
+ci.avg = function(ts, mle, cov) {
+  val = rep(0, length(ts))
+  for(i in seq_along(ts)) {
+    val[i] = logN(mle, ts[i])
+  }
+  val
+}
+
+t = seq(-1,1,length.out=length(cov$CMODateCount))
+
+
+with(cov,plot(1:41,cov$CMODateCount, main = "Number of new cases per day from 31/01/2020 to 11/03/2020",xlab = "Day No.", ylab = "Number of new cases"))
+
+lines(1:length(cov$CMODateCount), exp(ci.lower(t, theta1$par, covar)), col="blue")
+lines(1:length(cov$CMODateCount), exp(ci.avg(t, theta1$par, covar)), col="red")
+lines(1:length(cov$CMODateCount), exp(ci.upper(t, theta1$par, covar)), col="purple")
+legend("topleft",
+       legend=c("95% CI upper bound", "Estimated model", "95% CI lower bound"),
+       col=c("purple", "red", "blue"), lty=1, cex=0.8)
