@@ -16,16 +16,19 @@ N = function(t, n0, beta) {
 
 ### 1 ###
 # produces function to evaluate the negative log likelihood of the model
-# y ~ Poi(N(t))
+# y_t ~ Poi(N(t)) independent
 
 neg_loglike = function(theta,y) {
   n0 = theta[1]
   beta = theta[2:length(theta)]
   n = length(y)
-  t = seq(-1, 1, length.out=n) # run from -1 to 1 so model is invariant to units that time is measure in, so it doesn't matter if time is measure in seconds, days, or months.
+  t = seq(-1, 1, length.out=n) # run from -1 to 1 in equal steps
+# the model is invariant to units that time is measure in, so it doesn't matter if time is measure in seconds, days, or months.
+
   ll <-sum(dpois(y, N(t, n0, beta), log=TRUE)) # log likelihood of model
   -ll # negative log likelihood of model
 }
+
 
 # produces a function to work out AIC of the model
 AIC = function(num_par, val_ll) {
@@ -33,7 +36,7 @@ AIC = function(num_par, val_ll) {
 }
 
 ### 2 ###
-# fits models with K values from 1 to 5, finds the MLE for theta, finds AIC
+# fits models with K values from 1 to 5, finds the MLE for theta, finds AIC for each model
 
 for (K in 1:5) {
   theta0 = integer(K+1) # initial parameter values
@@ -41,17 +44,17 @@ for (K in 1:5) {
   # finds the MLE for theta using optim
   theta.hat = optim(theta0, neg_loglike, method="BFGS", y=cov$CMODateCount)
 
-  n0 = theta.hat$par[1]
-  beta = theta.hat$par[2:length(theta.hat$par)]
+  n0.hat = theta.hat$par[1]
+  beta.hat = theta.hat$par[2:length(theta.hat$par)]
 
   t = seq(-1, 1, length.out=length(cov$CMODateCount))
 
  # produce a plot of how well the model fits the data for K from 1 to 5
   with(cov,plot(1:41,cov$CMODateCount, main = "Number of new cases per day from 31/01/2020 to 11/03/2020",xlab = "Day No.", ylab = "Number of new cases"))
 
-  e = exp(n0)
-  for (i in seq_along(beta)) {
-    e = e * exp(beta[i] * t^i)
+  e = exp(n0.hat)
+  for (i in seq_along(beta.hat)) {
+    e = e * exp(beta.hat[i] * t^i)
   }
 
   lines(1:length(cov$CMODateCount), e, col="red")
@@ -61,35 +64,31 @@ for (K in 1:5) {
 }
 
 # Comment: By comparing the AIC values for each K from 1 to 5, the model with K=4 (i.e. 5 parameters)
-# is the best model because it has the lowest AIC value. By minimising AIC, we minimise the Kullback-Leibler
-# divergence. This implies the model with K=4 is the model that is the closest to the true model in the
-# probabilistic average sense.
+# is the best model because it has the lowest AIC value. By minimising AIC, we minimise the Kullback-Leibler divergence.
+# This implies the model with K=4 is the model that is the closest to the true model in the probabilistic average sense.
 
 # We want to test whether the model when K=4 can be simplified or not.
 # Null hypothesis: the model with K=3 (Model A) is a good fit to the data
 # Alternative hypothesis: the model with K=4 (Model B) is a good fit to the data
-# We will conduct the hypothesis test using a generalised likelihood ratio statistic (GLRT) because Model A
-# is nested in Model B. In addition, GLRT generalises the Neyman-Pearson test statistic which is the most
-# powerful in simple hypotheses setting.
+# We will conduct the hypothesis test using a generalised likelihood ratio statistic (GLRT) because Model A is nested in Model B.
+# In addition, GLRT generalises the Neyman-Pearson test statistic which is the most powerful in simple hypotheses setting.
 
-
-# Null Hypothesis, H0
+# Null Hypothesis, H_0
 K0 = 3
-par0 = integer(K0+1) # dimension of theta in H0
+par0 = integer(K0+1) # dimension of theta in H_0
 theta0 = optim(par0, neg_loglike, method="BFGS", y=cov$CMODateCount) # MLE for theta when K=3
 
-# Alternative Hypothesis, H1
+# Alternative Hypothesis, H_1
 K1 = 4
-par1 = integer(K1+1) # dimension of theta in H1
+par1 = integer(K1+1) # dimension of theta in H_1
 theta1 = optim(par1, neg_loglike, method="BFGS", y=cov$CMODateCount) # MLE for theta when K=4
 
 t = 2 * (theta0$value - theta1$value) # GLRT test statisic
 p <- 1- pchisq(t,df=1) # degree of freedom is 1 because H0 imposes 1 restriction on the parameter vector
 p # p-value
 
-# Comment: since the p-value = 0.00075 is very small, it implies that our data is not very consistent
-# with H0 being true. Therefore, there is very strong evidence of rejecting H0. This implies the model
-# when K=4 cannot be simplified further.
+# Comment: since the p-value = 0.00075 is very small, it implies that our data is not very consistent with H0 being true.
+# Therefore, there is very strong evidence of rejecting H0. This implies the model when K=4 cannot be simplified further.
 
 ### 3 ###
 # Working on the model with K=4
@@ -103,12 +102,15 @@ print("The approximate covariance matrix is: ", quote=FALSE)
 covar
 
 ### 4 ###
+# finds approximate 95% confidence intervals for logN(t)
+
 T = function(ti) {
   c(1, ti^1, ti^2, ti^3, ti^4)
 }
 
 # writes a function which outputs the MLE of logN(t)
-# since logN(t) is a linear transformation of the parameters, by invariance under bijective reparameterization, the MLE of logN(t) is the linear transformation of the MLE for each parameter.
+# since logN(t) is a linear transformation of the parameters, by invariance under bijective reparameterization,
+# the MLE of logN(t) is the linear transformation of the MLE for each parameter.
 logN = function(mle, ti) {
   val = sum(mle * T(ti))
   val
@@ -116,7 +118,9 @@ logN = function(mle, ti) {
 
 # writes a function which outputs an approximate covariance matrix for logN(t)
 cov.logN = function(cov, ti) {
-  val = t(T(ti)) %*% cov %*% T(ti) # by the standard results on transformation of covariance matrix that cov(AX) = Acov(X)t(A) where X is a random variable and A is a constant matrix with correct dimensions
+  val = t(T(ti)) %*% cov %*% T(ti)
+  # by the standard results on transformation of covariance matrix that cov(AX) = Acov(X)t(A)
+  # where X is a random variable and A is a constant matrix with correct dimensions
   val
 }
 
@@ -126,7 +130,8 @@ ci.lower = function(ts, mle, cov) {
   for(i in seq_along(ts)) {
     val[i] = logN(mle, ts[i]) - qt(0.95, 36)*sqrt(cov.logN(cov, ts[i]))
   }
-  val # 95% confidence interval lower bound
+  # 95% confidence interval lower bound
+  val
 }
 
 # writes a function which outputs the 95% confidence interval upper bound
@@ -135,7 +140,8 @@ ci.upper = function(ts, mle, cov) {
   for(i in seq_along(ts)) {
     val[i] = logN(mle, ts[i]) + qt(0.95, 36)*sqrt(cov.logN(cov, ts[i]))
   }
-  val # 95% confidence interval upper bound
+  # 95% confidence interval upper bound
+  val
 }
 
 # the estimated model
@@ -147,14 +153,13 @@ ci.avg = function(ts, mle, cov) {
   val
 }
 
-t = seq(-1,1,length.out=length(cov$CMODateCount))
+# plots intervals for N(t)
 
+t = seq(-1,1,length.out=length(cov$CMODateCount))
 
 with(cov,plot(1:41,cov$CMODateCount, main = "Number of new cases per day from 31/01/2020 to 11/03/2020",xlab = "Day No.", ylab = "Number of new cases"))
 
 lines(1:length(cov$CMODateCount), exp(ci.lower(t, theta1$par, covar)), col="blue")
 lines(1:length(cov$CMODateCount), exp(ci.avg(t, theta1$par, covar)), col="red")
 lines(1:length(cov$CMODateCount), exp(ci.upper(t, theta1$par, covar)), col="purple")
-legend("topleft",
-       legend=c("95% CI upper bound", "Estimated model", "95% CI lower bound"),
-       col=c("purple", "red", "blue"), lty=1, cex=0.8)
+legend("topleft", legend=c("95% CI upper bound", "Estimated model", "95% CI lower bound"), col=c("purple", "red", "blue"), lty=1, cex=0.8)
