@@ -2,7 +2,7 @@ MATH35600 Assessed Practical 2020
 Danielle Bueno (db17072), Yuan Chen (yc17451), Ren Cheong (rc17719)
 
 ### Set Up ###
-cov <- read.table("covid19.csv", sep=",",header=TRUE)
+cov <- read.table("https://people.maths.bris.ac.uk/~sw15190/TOI/covid19.csv", sep=",",header=TRUE)
 # cov$CMODateCount #
 
 # the simple model that allows for departure from unbounded exponential growth
