@@ -23,16 +23,19 @@ N = function(t, n0, beta) {
 # Question 1
 ```{r}
 # produces function to evaluate the negative log likelihood of the model
-# y ~ Poi(N(t))
+# y_t ~ Poi(N(t)) independent
 
 neg_loglike = function(theta,y) {
   n0 = theta[1]
   beta = theta[2:length(theta)]
   n = length(y)
-  t = seq(-1, 1, length.out=n) # run from -1 to 1 so model is invariant to units that time is measure in, so it doesn't matter if time is measure in seconds, days, or months.
+  t = seq(-1, 1, length.out=n) # run from -1 to 1 in equal steps
+# the model is invariant to units that time is measure in, so it doesn't matter if time is measure in seconds, days, or months.
+  
   ll <-sum(dpois(y, N(t, n0, beta), log=TRUE)) # log likelihood of model
   -ll # negative log likelihood of model
 }
+
 
 # produces a function to work out AIC of the model
 AIC = function(num_par, val_ll) {
@@ -43,7 +46,7 @@ AIC = function(num_par, val_ll) {
 
 # Question 2
 ```{r}
-# fits models with K values from 1 to 5, finds the MLE for theta, finds AIC
+# fits models with K values from 1 to 5, finds the MLE for theta, finds AIC for each model
 
 for (K in 1:5) {
   theta0 = integer(K+1) # initial parameter values
@@ -51,17 +54,17 @@ for (K in 1:5) {
   # finds the MLE for theta using optim
   theta.hat = optim(theta0, neg_loglike, method="BFGS", y=cov$CMODateCount)
   
-  n0 = theta.hat$par[1]
-  beta = theta.hat$par[2:length(theta.hat$par)]
+  n0.hat = theta.hat$par[1]
+  beta.hat = theta.hat$par[2:length(theta.hat$par)]
   
   t = seq(-1, 1, length.out=length(cov$CMODateCount))
   
  # produce a plot of how well the model fits the data for K from 1 to 5
   with(cov,plot(1:41,cov$CMODateCount, main = "Number of new cases per day from 31/01/2020 to 11/03/2020",xlab = "Day No.", ylab = "Number of new cases"))
   
-  e = exp(n0)
-  for (i in seq_along(beta)) {
-    e = e * exp(beta[i] * t^i)
+  e = exp(n0.hat)
+  for (i in seq_along(beta.hat)) {
+    e = e * exp(beta.hat[i] * t^i)
   }
 
   lines(1:length(cov$CMODateCount), e, col="red")
@@ -82,14 +85,14 @@ for (K in 1:5) {
 # We will conduct the hypothesis test using a generalised likelihood ratio statistic (GLRT) because Model A is nested in Model B. In addition, GLRT generalises the Neyman-Pearson test statistic which is the most powerful in simple hypotheses setting.
 
 
-# H0
+# H_0
 K0 = 3 
-par0 = integer(K0+1) # dimension of theta in H0
+par0 = integer(K0+1) # dimension of theta in H_0
 theta0 = optim(par0, neg_loglike, method="BFGS", y=cov$CMODateCount) # MLE for theta when K=3
 
-# H1
+# H_1
 K1 = 4
-par1 = integer(K1+1) # dimension of theta in H1
+par1 = integer(K1+1) # dimension of theta in H_1
 theta1 = optim(par1, neg_loglike, method="BFGS", y=cov$CMODateCount) # MLE for theta when K=4
 
 t = 2 * (theta0$value - theta1$value) # GLRT test statisic
@@ -116,6 +119,8 @@ covar
 
 # Question 4
 ```{r}
+
+# finds approximate 95% confidence intervals for logN(t)
 
 T = function(ti) {
   c(1, ti^1, ti^2, ti^3, ti^4)
@@ -161,8 +166,10 @@ ci.avg = function(ts, mle, cov) {
   val
 }
 
-t = seq(-1,1,length.out=length(cov$CMODateCount))
 
+# plots intervals for N(t)
+
+t = seq(-1,1,length.out=length(cov$CMODateCount))
 
 with(cov,plot(1:41,cov$CMODateCount, main = "Number of new cases per day from 31/01/2020 to 11/03/2020",xlab = "Day No.", ylab = "Number of new cases"))
 
